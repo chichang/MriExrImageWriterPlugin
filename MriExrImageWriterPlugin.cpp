@@ -258,9 +258,9 @@ MriImagePluginResult save(MriImageHandle ImageHandle, const char *pFileName, con
         config.attribute ("maketx:opaquedetect", 1);
 
         //metadata
-        config.attribute("mrx_show", getenv("SHOW"));
-        config.attribute("mrx_shot", getenv("SHOT"));
-        config.attribute("mrx_artist", getenv("USER"));
+        config.attribute("show", getenv("SHOW"));
+        config.attribute("shot", getenv("SHOT"));
+        config.attribute("artist", getenv("USER"));
 
         //write image
         stringstream s; //s.str()
