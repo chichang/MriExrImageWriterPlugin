@@ -103,28 +103,45 @@ MriImagePluginResult save(MriImageHandle ImageHandle, const char *pFileName, con
     case MRI_IDF_BYTE_RGB:
         NumChannels = 3;
         ChannelSize = 1;
-        break;
+        s_Host.trace("Channel format not supported: %d", Format);
+        return MRI_IPR_FAILED;
+        //break;
+
     case MRI_IDF_BYTE_RGBA:
         NumChannels = 4;
         ChannelSize = 1;
-        break;
+        s_Host.trace("Channel format not supported: %d", Format);
+        return MRI_IPR_FAILED;
+        //break;
+
     case MRI_IDF_HALF_RGB:
         NumChannels = 3;
         ChannelSize = 2;
         break;
-    //MRI_IDF_HALF_RGBA
+        s_Host.trace("Channel format not supported: %d", Format);
+        return MRI_IPR_FAILED;
+        //break;
+
+    //MRI_IDF_HALF_RGBA. this is the only channel type thats supported at the moment.
     case MRI_IDF_HALF_RGBA:
         NumChannels = 4;
         ChannelSize = 2;
         break;
+
     case MRI_IDF_FLOAT_RGB:
         NumChannels = 3;
         ChannelSize = 4;
-        break;
+        s_Host.trace("Channel format not supported: %d", Format);
+        return MRI_IPR_FAILED;
+        //break;
+
     case MRI_IDF_FLOAT_RGBA:
         NumChannels = 4;
         ChannelSize = 4;
-        break;
+        s_Host.trace("Channel format not supported: %d", Format);
+        return MRI_IPR_FAILED;
+        //break;
+
     default:
         s_Host.trace("Invalid format: %d", Format);
         return MRI_IPR_FAILED;
@@ -284,7 +301,7 @@ MriImageDataFormat *supportedImageFormats(const char *pExtension, int *pNumForma
 //------------------------------------------------------------------------------
 MriFileFormatDesc *supportedFormats(int *pNumFormatsOut)
 {
-    static MriFileFormatDesc s_Format = { "exr", "mipmap exr writer plug-in" };
+    static MriFileFormatDesc s_Format = { "exr", "mipmap exr writer plug-in by chi-chang chu" };
     *pNumFormatsOut = 1;
     return &s_Format;
 }
@@ -324,7 +341,7 @@ FnPluginStatus setImageWriterHost(const FnPluginHost *pHost)
 DLLEXPORT FnPlugin *getPlugins(unsigned int *pNumPlugins)
 {
     static FnPlugin s_Plugin;
-    s_Plugin.name               = "MrxExrWriter";
+    s_Plugin.name               = "ccMriMipMapExrWriter";
     s_Plugin.pluginVersionMajor = 1;
     s_Plugin.pluginVersionMinor = 0;
     s_Plugin.apiName            = MRI_IMAGE_WRITER_API_NAME;
