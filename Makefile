@@ -1,13 +1,13 @@
 #-------------------------------------------------------------------------------
 # Mari OIIO Mip-Map Exr Image Writer Plugin
 #-------------------------------------------------------------------------------
-
-MRI_INCLUDE_DIR = /X/tools/binlinux/apps/Mari2.6v1/SDK/include
+MRI_VERSION = 3.0v2
+MRI_INCLUDE_DIR = /X/tools/binlinux/apps/Mari$(MRI_VERSION)/SDK/include
 
 PLUGIN_NAME = ExrImageWriterPlugin
 SRC_NAME = Mri$(PLUGIN_NAME).cpp
 LIB_NAME = lib$(PLUGIN_NAME).so
-INSTALL_DIR = 
+INSTALL_DIR = build
 INSTALL_NAME = $(INSTALL_DIR)/$(LIB_NAME)
 
 EXR_INCLUDE_DIR = /X/tools/packages/gcc-4.1/openexr/openexr_1.7.1/include
@@ -21,10 +21,11 @@ $(LIB_NAME): $(SRC_NAME) $(MRI_INCLUDE_DIR)/FnPluginSystem.h $(MRI_INCLUDE_DIR)/
 
 $(INSTALL_NAME):
 	mkdir -p $(INSTALL_DIR)
-	ln -s $(CURDIR)/$(LIB_NAME) $(INSTALL_NAME)
+	#ln -s $(CURDIR)/$(LIB_NAME) $(INSTALL_NAME)
+	mv $(LIB_NAME) $(INSTALL_NAME)
 
 clean:
-	rm -f $(LIB_NAME)
+	rm -f $(INSTALL_NAME)
 
 install: build $(INSTALL_NAME)
 

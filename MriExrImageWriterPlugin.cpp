@@ -117,7 +117,6 @@ MriImagePluginResult save(MriImageHandle ImageHandle, const char *pFileName, con
     case MRI_IDF_HALF_RGB:
         NumChannels = 3;
         ChannelSize = 2;
-        break;
         s_Host.trace("Channel format not supported: %d", Format);
         return MRI_IPR_FAILED;
         //break;
@@ -169,23 +168,41 @@ MriImagePluginResult save(MriImageHandle ImageHandle, const char *pFileName, con
         Width = MipMapInfo.m_Width;
         Height = MipMapInfo.m_Height;
 
-        //create oiio objects
+        //create oiio buffer
         ImageSpec spec (Width, Height, NumChannels, TypeDesc::FLOAT);
         ImageBuf Input("mriExrWriterBuf", spec);
 
         // Allocate a buffer big enough to hold a complete set of tiles in the x axis.
-        BufferSize = MipMapInfo.m_Width * TileSizeY;
-        pBuffer = (unsigned char*)malloc(BufferSize);
+        //BufferSize = MipMapInfo.m_Width * TileSizeY;
+        // Allocate a buffer big enough to hold a complete tile.
+        BufferSize = (TileSizeX * TileSizeY);//*(NumChannels*ChannelSize);
+
+	//Allocates a block of size bytes of memory, returning a pointer to the beginning of the block. (in bytes)
+        pBuffer = (unsigned char*)malloc(BufferSize);	//TODO: is this size right? double check...
+
+
+	int t_w = TileWidth;
+	int t_h = TileHeight;
+
+	int roi_ybegin = 0;
+
+	s_Host.trace("tile width %d", t_w);
+	s_Host.trace("this is starting");
+
+	ROI region = get_roi(spec);
 
         //s_Host.trace("Mip-map %d tile count: %dx%d", MipMapLevel, MipMapInfo.m_NumTilesX, MipMapInfo.m_NumTilesY);
         for (TileY = 0; TileY < MipMapInfo.m_NumTilesY; ++TileY)
         {
-            //reset every new Y tile.
-            pPtr = pBuffer;
-
-            //for each Y row. loop through all x tiles.
+	    int roi_xbegin = 0;
+            //for each Y row. loop through each x tiles.
             for (TileX = 0; TileX < MipMapInfo.m_NumTilesX; ++TileX)
             {
+
+		//reset every new tile.
+            	pPtr = pBuffer;
+
+
                 Result = s_Host.getTileHashSize(ImageHandle, TileX, TileY, MipMapLevel, &HashSize);
                 if (MRI_IPR_SUCCEEDED != Result)
                 {
@@ -218,10 +235,75 @@ MriImagePluginResult save(MriImageHandle ImageHandle, const char *pFileName, con
                     free(pBuffer);
                     return Result;
                 }
+		//one tile loaded
+
+		region.xbegin = roi_xbegin;
+		region.ybegin = roi_ybegin;
+		region.xend = (roi_xbegin+t_w);
+		region.yend = (roi_ybegin+t_h);
+
+		//write the loaded tile to oiio image buffer.
+
+
+		//for each Scanline in a tile
+	        //for (Scanline = 0; Scanline < TileHeight; ++Scanline) {
+
+		
+                    //cast pointer to a half pointer
+                    pVoid = pPtr;
+                    pHalf = static_cast<half*>(pVoid);
+                    //figureout how many bytes are in the tile scanline
+                    //loop through the current scanline and grab the value as half
+                    //TileSizeX( int bytes)/(sizeof(half)*numChannels)
+		    /*
+                    for (int i=0; i < TileSizeX/(ChannelSize*NumChannels); ++ i) {
+                        //todo: add in other channal type support.(for now only 16bit RGBA)
+                        //for p<NumChannels. set valu for each channel on the pixcel.
+                        for (int p=0; p<NumChannels; ++p)
+                        {
+                            pixel[p]=(float)*pHalf;
+                            pHalf += 1; 
+                        }
+                        //set pixcel on image buffer.
+                        //todo: use image buffer iterator to get better performance.
+                        Input.setpixel(buf_x,buf_y,pixel);
+                        buf_x += 1;
+		    */
+			//create iterator for the tile and write it to the buffer
+			for (ImageBuf::Iterator<float> it (Input, region); ! it.done(); ++it) {
+				if (! it.exists()) {// Make sure the iterator is pointing
+        		        s_Host.trace("iterator not pointing to a pixel in the data window");
+				continue; // to a pixel in the data window
+				} else {}
+			for (int c = region.chbegin; c < region.chend; ++c) {
+				    //it[c] = 0.0f; // clear the value
+				    it[c] = (float)*pHalf;; //set val. one channel.
+		                    pHalf += 1;
+				}
+			}
+
+
+
+		    //}
+
+		//}
+
+		//}
+
                 //move the pointer begining of the next tile. 
-                pPtr += TileSize;
+                //pPtr += TileSize;
+		
+		roi_xbegin += t_w;
+		s_Host.trace("xbegin %d", roi_xbegin);
+		//break;
             }
             // The whole row of X tiles loaded into buffer.
+
+
+
+
+
+	    /*
 
             // not for the example can just keeps writing. for our frame buffer we need to shift the base
             // for each y row.
@@ -246,11 +328,11 @@ MriImagePluginResult save(MriImageHandle ImageHandle, const char *pFileName, con
                     //figureout how many bytes are in the tile scanline
                     //loop through the current scanline and grab the value as half
                     //TileSizeX( int bytes)/(sizeof(half)*numChannels)
-                    for (int i=0; i < TileSizeX/(2*4); ++ i)
+                    for (int i=0; i < TileSizeX/(ChannelSize*NumChannels); ++ i)
                     {
                         //todo: add in other channal type support.(for now only 16bit RGBA)
                         //for p<NumChannels. set valu for each channel on the pixcel.
-                        for (int p=0; p<4; ++p)
+                        for (int p=0; p<NumChannels; ++p)
                         {
                             pixel[p]=(float)*pHalf;
                             pHalf += 1; 
@@ -264,7 +346,14 @@ MriImagePluginResult save(MriImageHandle ImageHandle, const char *pFileName, con
                     //move pPtr to next tile
                     pPtr += TileSize;
                 }
-            }
+            }*/
+
+
+	roi_ybegin += t_h;
+
+
+	//if (roi_xbegin > 500){s_Host.trace("testbreak"); break;}
+
         }
         free(pBuffer);
 
@@ -278,6 +367,8 @@ MriImagePluginResult save(MriImageHandle ImageHandle, const char *pFileName, con
         config.attribute("show", getenv("SHOW"));
         config.attribute("shot", getenv("SHOT"));
         config.attribute("artist", getenv("USER"));
+
+	s_Host.trace("this is working");
 
         //write image
         stringstream s; //s.str()
@@ -341,7 +432,7 @@ FnPluginStatus setImageWriterHost(const FnPluginHost *pHost)
 DLLEXPORT FnPlugin *getPlugins(unsigned int *pNumPlugins)
 {
     static FnPlugin s_Plugin;
-    s_Plugin.name               = "ccMriMipMapExrWriter";
+    s_Plugin.name               = "ccMriExrWriter";
     s_Plugin.pluginVersionMajor = 1;
     s_Plugin.pluginVersionMinor = 0;
     s_Plugin.apiName            = MRI_IMAGE_WRITER_API_NAME;
