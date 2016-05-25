@@ -78,81 +78,90 @@ OIIO_NAMESPACE_USING
 // Plug-in suite function definitions
 //------------------------------------------------------------------------------
 
-MriImagePluginResult save(MriImageHandle ImageHandle, const char *pFileName, const char **ppMessageStringOut,
-                          MriImageDataFormat Format, int NumMipMapLevels, int TileWidth, int TileHeight)
+MriImagePluginResult save(MriImageHandle ImageHandle, 
+                            const char *pFileName, 
+                            const char **ppMessageStringOut,
+                            MriImageDataFormat Format, 
+                            int NumMipMapLevels, 
+                            int TileWidth, 
+                            int TileHeight)
 {
     MriImagePluginResult Result;
+
     MriImageMipMapInfo MipMapInfo;
+
     int NumChannels, ChannelSize;
-    int BufferSize, MipMapLevel, PixcelSize;
+    int Width, Height;
+    int BufferSize, PixcelSize;
     int TileSizeX, TileSizeY, TileSize, TileX, TileY;
     int HashSize;
-    int Width, Height;
+    int MipMapLevel = 0;
+
     unsigned char *pBuffer = NULL;
     unsigned char *pPtr = NULL;
     char *pHash = NULL;
     half *pHalf;
     float *pFloat;
     void *pVoid;
-    MipMapLevel = 0;
 
-    //todo:check if the channel is supported.
-    //channel format.
+    ImageSpec spec;
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    //channel format. not supporting 8bit data type.
     switch (Format)
     {
-    case MRI_IDF_BYTE_RGB:
-        NumChannels = 3;
-        ChannelSize = 1;
-        s_Host.trace("Channel format not supported: %d", Format);
-        return MRI_IPR_FAILED;
-        //break;
+        case MRI_IDF_BYTE_RGB:
+            NumChannels = 3;
+            ChannelSize = 1;
+            s_Host.trace("Channel format not supported: %d", Format);
+            return MRI_IPR_FAILED;
 
-    case MRI_IDF_BYTE_RGBA:
-        NumChannels = 4;
-        ChannelSize = 1;
-        s_Host.trace("Channel format not supported: %d", Format);
-        return MRI_IPR_FAILED;
-        //break;
+        case MRI_IDF_BYTE_RGBA:
+            NumChannels = 4;
+            ChannelSize = 1;
+            s_Host.trace("Channel format not supported: %d", Format);
+            return MRI_IPR_FAILED;
 
-    case MRI_IDF_HALF_RGB:
-        NumChannels = 3;
-        ChannelSize = 2;
-        break;
+        case MRI_IDF_HALF_RGB:
+            NumChannels = 3;
+            ChannelSize = 2;
+            break;
 
-    //MRI_IDF_HALF_RGBA. this is the only channel type thats supported at the moment.
-    case MRI_IDF_HALF_RGBA:
-        NumChannels = 4;
-        ChannelSize = 2;
-        break;
+        case MRI_IDF_HALF_RGBA:
+            NumChannels = 4;
+            ChannelSize = 2;
+            break;
 
-    case MRI_IDF_FLOAT_RGB:
-        NumChannels = 3;
-        ChannelSize = 4;
-        break;
+        case MRI_IDF_FLOAT_RGB:
+            NumChannels = 3;
+            ChannelSize = 4;
+            break;
 
-    case MRI_IDF_FLOAT_RGBA:
-        NumChannels = 4;
-        ChannelSize = 4;
-        break;
+        case MRI_IDF_FLOAT_RGBA:
+            NumChannels = 4;
+            ChannelSize = 4;
+            break;
 
-    default:
-        s_Host.trace("Invalid format: %d", Format);
-        return MRI_IPR_FAILED;
+        default:
+            s_Host.trace("Invalid format: %d", Format);
+            return MRI_IPR_FAILED;
     }
 
     //bytes of one pixcel.
     PixcelSize = NumChannels * ChannelSize;
 
-    //bytes of y row
+    //bytes of one tile.
     TileSizeY = TileHeight * PixcelSize;
     TileSizeX = TileWidth * PixcelSize;
     TileSize = TileWidth * TileSizeY;
 
-    //for this we only care about level 0 since OpenImageIO takes care of the mipmap.
-    for (; MipMapLevel  <= 0 ; ++MipMapLevel)
+    //for this we only care about level 0 since OpenImageIO takes care of the mipmaps.
+    for (; MipMapLevel  <= 0 ; ++MipMapLevel) 
     {
         //getting info of current mipmap level.
         Result = s_Host.getMipMapInfo(ImageHandle, MipMapLevel, &MipMapInfo);
+
         if (MRI_IPR_SUCCEEDED != Result)
         {
             s_Host.trace("Failed: %d", Result);
@@ -163,8 +172,22 @@ MriImagePluginResult save(MriImageHandle ImageHandle, const char *pFileName, con
         Width = MipMapInfo.m_Width;
         Height = MipMapInfo.m_Height;
 
-        //create oiio buffer
-        ImageSpec spec (Width, Height, NumChannels, TypeDesc::FLOAT);
+        //oiio spec
+        spec.width = Width;
+        spec.height = Height;
+        spec.nchannels = NumChannels;
+
+        //format
+        if (ChannelSize == 2)
+        {
+            spec.format = TypeDesc::HALF;
+        }
+        else if (ChannelSize == 4)
+        {
+            spec.format = TypeDesc::FLOAT;
+        } 
+        else {}
+
         ImageBuf Input("mriExrWriterBuf", spec);
 
         // Allocate a buffer big enough to hold a complete set of tiles in the x axis.
@@ -172,25 +195,27 @@ MriImagePluginResult save(MriImageHandle ImageHandle, const char *pFileName, con
         // Allocate a buffer big enough to hold a complete tile.
         BufferSize = (TileSizeX * TileSizeY)*(NumChannels*ChannelSize);
 
-	//Allocates a block of size bytes of memory, returning a pointer to the beginning of the block. (in bytes)
+        //Allocates a block of size bytes of memory, returning a pointer to the beginning of the block. (in bytes)
         pBuffer = (unsigned char*)malloc(BufferSize);	//TODO: is this size right? double check...
 
-	int t_w = TileWidth;
-	int t_h = TileHeight;
+        //roi
+        int t_w = TileWidth;
+        int t_h = TileHeight;
+        ROI region = get_roi(spec);
 
-	int roi_ybegin = 0;
-	//roi
-	ROI region = get_roi(spec);
+        int roi_ybegin = 0;
 
-        //s_Host.trace("Mip-map %d tile count: %dx%d", MipMapLevel, MipMapInfo.m_NumTilesX, MipMapInfo.m_NumTilesY);
-        for (TileY = 0; TileY < MipMapInfo.m_NumTilesY; ++TileY) {
+        s_Host.trace("Mip-map %d tile count: %dx%d", MipMapLevel, MipMapInfo.m_NumTilesX, MipMapInfo.m_NumTilesY);
 
-	    int roi_xbegin = 0;
+        // for y
+        for (TileY = 0; TileY < MipMapInfo.m_NumTilesY; ++TileY) 
+        {
+            int roi_xbegin = 0;
 
             //for each Y row. loop through each x tiles.
-            for (TileX = 0; TileX < MipMapInfo.m_NumTilesX; ++TileX) {
-
-		//reset every new tile.
+            for (TileX = 0; TileX < MipMapInfo.m_NumTilesX; ++TileX) 
+            {
+                //reset pointer every new tile.
             	pPtr = pBuffer;
 
                 Result = s_Host.getTileHashSize(ImageHandle, TileX, TileY, MipMapLevel, &HashSize);
@@ -201,70 +226,88 @@ MriImagePluginResult save(MriImageHandle ImageHandle, const char *pFileName, con
                 }
 
                 pHash = (char*)malloc(HashSize);
-
                 Result = s_Host.getTileHash(ImageHandle, TileX, TileY, MipMapLevel, pHash, HashSize);
-                if (MRI_IPR_SUCCEEDED != Result) {
+
+                if (MRI_IPR_SUCCEEDED != Result) 
+                {
                     s_Host.trace("Failed: %d", Result);
                     free(pHash);
                     free(pBuffer);
                     return Result;
                 }
-                //looping through each x tile...
-                //s_Host.trace("Filling in tile (%d, %d) - {%s}\n", TileX, TileY, pHash);
                 free(pHash);
 
+                s_Host.trace("Filling in tile (%d, %d) - {%s}\n", TileX, TileY, pHash);
+
                 //load the tile bites into the buffer.
+                //pData   The address of a buffer that is at least DataSizeBytes long that will receive the image data from the tile
                 Result = s_Host.loadTile(ImageHandle, TileX, TileY, MipMapLevel, pPtr, TileSize);
 
-                //pData   The address of a buffer that is at least DataSizeBytes long that will receive the image data from the tile
-                if (MRI_IPR_SUCCEEDED != Result) {
+                if (MRI_IPR_SUCCEEDED != Result)
+                {
                     s_Host.trace("Failed: %d", Result);
                     free(pBuffer);
                     return Result;
                 }
 
-		//one tile loaded
-		
-		//set fuffer regin
-		region.xbegin = roi_xbegin;
-		region.ybegin = roi_ybegin;
-		region.xend = (roi_xbegin+t_w);
-		region.yend = (roi_ybegin+t_h);
+                //one tile loaded
+                //set buffer regin to current tile.
+                region.xbegin = roi_xbegin;
+                region.ybegin = roi_ybegin;
+                region.xend = (roi_xbegin+t_w);
+                region.yend = (roi_ybegin+t_h);
 
-		//write the loaded tile to image buffer.
+                //write the loaded tile to image buffer.
+                //cast pointer to a half pointer if data type is half.
+                pVoid = pPtr;
+                pHalf = static_cast<half*>(pVoid);
+                pFloat = static_cast<float*>(pVoid);
 
-		//cast pointer to a half pointer if data type is half.
-		pVoid = pPtr;
-		pHalf = static_cast<half*>(pVoid);
-		pFloat = static_cast<float*>(pVoid);
+                //half
+                if (ChannelSize == 2)
+                {
+                    //create iterator for the tile and write it to the buffer
+                    for (ImageBuf::Iterator<half> it (Input, region); ! it.done(); ++it) 
+                    {
+                        if (! it.exists()) // Make sure the iterator is pointing to a pixel in the data window
+                        {
+                            s_Host.trace("iterator not pointing to a pixel in the data window");
+                            continue;
+                        } else {}
 
-		//create iterator for the tile and write it to the buffer
-		//for (ImageBuf::Iterator<float> it (Input, region); ! it.done(); ++it) {
-		for (ImageBuf::Iterator<float> it (Input, region); ! it.done(); ++it) {
-			if (! it.exists()) {// Make sure the iterator is pointing
-			s_Host.trace("iterator not pointing to a pixel in the data window");
-			continue; // to a pixel in the data window
-			} else {}
-		for (int c = region.chbegin; c < region.chend; ++c) {
-				//define size of half
-				if (ChannelSize == 2){
-				    //it[c] = 0.0f; // clear the value
-				    it[c] = (float)*pHalf; //set val. one channel.
-				    pHalf += 1;
-				}
-				//define size of float
-				else if (ChannelSize == 4){
-				    it[c] = *pFloat; //set val. one channel.
-				    pFloat += 1;
-				} else {}
+                        for (int c = region.chbegin; c < region.chend; ++c) 
+                        {
+                            //it[c] = 0.0f; // clear the value
+                            it[c] = (float)*pHalf; //set val on channel.
+                            pHalf += 1;
+                        }
+                    }
+                }
+                //float
+                else if (ChannelSize == 4)
+                {
+                    for (ImageBuf::Iterator<float> it (Input, region); ! it.done(); ++it)
+                    {
+                        if (! it.exists()) 
+                        {
+                            s_Host.trace("iterator not pointing to a pixel in the data window");
+                            continue;
+                        } else {}
 
-			}
-		}
+                        for (int c = region.chbegin; c < region.chend; ++c) 
+                        {
+                            it[c] = *pFloat;
+                            pFloat += 1;
+                        }
+                    }
+                } else{}
 
-		roi_xbegin += t_w;
+            //x done
+            roi_xbegin += t_w;
             }
 
-	roi_ybegin += t_h;
+        //y done
+        roi_ybegin += t_h;
         }
 
         free(pBuffer);
@@ -279,8 +322,9 @@ MriImagePluginResult save(MriImageHandle ImageHandle, const char *pFileName, con
         config.attribute("show", getenv("SHOW"));
         config.attribute("shot", getenv("SHOT"));
         config.attribute("artist", getenv("USER"));
+        config.attribute("mri_writer", getenv("ccMriMipMapExrWriter"));
 
-        //write image
+        //write out the texture
         stringstream s; //s.str()
         bool success = ImageBufAlgo::make_texture (ImageBufAlgo::MakeTxTexture,Input, pFileName, config, &s);
         if (! success)
