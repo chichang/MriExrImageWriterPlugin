@@ -4,10 +4,12 @@
 MRI_VERSION = 3.0v2
 MRI_INCLUDE_DIR = /X/tools/binlinux/apps/Mari$(MRI_VERSION)/SDK/include
 
-PLUGIN_NAME = ExrImageWriterPlugin
-SRC_NAME = Mri$(PLUGIN_NAME).cpp
+PLUGIN_NAME = CcExrImageWriterPlugin
+SRC_NAME = $(PLUGIN_NAME).cpp
 LIB_NAME = lib$(PLUGIN_NAME).so
-INSTALL_DIR = build
+#INSTALL_DIR = build
+INSTALL_DIR = /X/tools/mari/mrx/plugins
+
 INSTALL_NAME = $(INSTALL_DIR)/$(LIB_NAME)
 
 EXR_INCLUDE_DIR = /X/tools/packages/gcc-4.1/openexr/openexr_1.7.1/include
@@ -33,4 +35,5 @@ build: $(LIB_NAME)
 
 rebuild: clean build
 
-all: build
+all: buildls
+
