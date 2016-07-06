@@ -106,6 +106,7 @@ MriImagePluginResult save(MriImageHandle ImageHandle,
     half *pHalf;
     float *pFloat;
     void *pVoid;
+    unsigned char *pByte;
 
     ImageSpec spec;
 
@@ -117,14 +118,16 @@ MriImagePluginResult save(MriImageHandle ImageHandle,
         case MRI_IDF_BYTE_RGB:
             NumChannels = 3;
             ChannelSize = 1;
-            s_Host.trace("Channel format not supported: %d", Format);
-            return MRI_IPR_FAILED;
+            s_Host.trace("Channel size: %d", ChannelSize);
+            //return MRI_IPR_FAILED;
+            break;
 
         case MRI_IDF_BYTE_RGBA:
             NumChannels = 4;
             ChannelSize = 1;
-            s_Host.trace("Channel format not supported: %d", Format);
-            return MRI_IPR_FAILED;
+            s_Host.trace("Channel size: %d", ChannelSize);
+            //return MRI_IPR_FAILED;
+            break;
 
         case MRI_IDF_HALF_RGB:
             NumChannels = 3;
@@ -186,6 +189,10 @@ MriImagePluginResult save(MriImageHandle ImageHandle,
         {
             spec.format = TypeDesc::HALF;
         }
+        else if (ChannelSize == 1)
+        {
+            spec.format = TypeDesc::UINT8;
+        } 
         else if (ChannelSize == 4)
         {
             spec.format = TypeDesc::FLOAT;
@@ -267,6 +274,7 @@ MriImagePluginResult save(MriImageHandle ImageHandle,
                 pVoid = pPtr;
                 pHalf = static_cast<half*>(pVoid);
                 pFloat = static_cast<float*>(pVoid);
+                pByte = static_cast<unsigned char*>(pVoid);
 
                 //half
                 if (ChannelSize == 2)
@@ -288,6 +296,36 @@ MriImagePluginResult save(MriImageHandle ImageHandle,
                         }
                     }
                 }
+
+
+                //8bit
+                else if (ChannelSize == 1)
+                {
+                    for (ImageBuf::Iterator<unsigned char> it (Input, region); ! it.done(); ++it)
+                    {
+                        if (! it.exists())
+                        {
+                            s_Host.trace("iterator not pointing to a pixel in the data window");
+                            continue;
+                        } else {}
+
+                        for (int c = region.chbegin; c < region.chend; ++c) 
+                        {
+
+			    //here for testing simply devide the value by 255. make sure we are at lease getting the right image.
+			    float charVal = (float)(*pByte);
+			    float devideBy = 255.0f;
+
+                            it[c] = charVal/devideBy;
+
+        		    //hack! trace every single value so we see we are getting "something"
+        		    //s_Host.trace("val: %f",  charVal/devideBy);
+
+                            pByte += 1;
+                        }
+                    }
+		}
+
                 //float
                 else if (ChannelSize == 4)
                 {
@@ -358,7 +396,7 @@ MriImageDataFormat *supportedImageFormats(const char *pExtension, int *pNumForma
 //------------------------------------------------------------------------------
 MriFileFormatDesc *supportedFormats(int *pNumFormatsOut)
 {
-    static MriFileFormatDesc s_Format = { "exr", "mipmap exr writer plug-in by chi-chang chu" };
+    static MriFileFormatDesc s_Format = { "tif", "mipmap tif writer plug-in by chi-chang chu" };
     *pNumFormatsOut = 1;
     return &s_Format;
 }
@@ -411,101 +449,3 @@ DLLEXPORT FnPlugin *getPlugins(unsigned int *pNumPlugins)
     return &s_Plugin;
 }
 
-
-/*
-default export:
-Debug : [          MriImageExporter.cpp:768 ] : Export path: /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/diffuse/v002
-Debug : [          MriImageExporter.cpp:769 ] : Export template: WHITE_HOUSE_col_linh_$UDIM.exr
-Debug : [          MriOpenExrSource.cpp:815 ] : [ !! ] '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/diffuse/v002/WHITE_HOUSE_col_linh_$UDIM.exr' is not a valid OpenEXR file
-Debug : [     MriSnChannelInputNode.cpp:238 ] : [ -- ] Refreshing properties for paint node 'Paint 12'
-Debug : [          MriOpenExrSource.cpp:815 ] : [ !! ] '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/diffuse/v002/WHITE_HOUSE_col_linh_$UDIM.exr' is not a valid OpenEXR file
-Debug : [     MriSnChannelInputNode.cpp:238 ] : [ -- ] Refreshing properties for paint node 'Paint 12'
-Debug : [          MriOpenExrSource.cpp:815 ] : [ !! ] '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/diffuse/v002/WHITE_HOUSE_col_linh_$UDIM.exr' is not a valid OpenEXR file
-Debug : [          MriOpenExrSource.cpp:815 ] : [ !! ] '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/diffuse/v002/WHITE_HOUSE_col_linh_$UDIM.exr' is not a valid OpenEXR file
-Repeat : Message repeating...
-Repeat : Last message was repeated 2 more times
-Debug : [          MriOpenExrSource.cpp:815 ] : [ !! ] '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE_col_linh_$UDIM.exr' is not a valid OpenEXR file
-Debug : [          MriOpenExrSource.cpp:815 ] : [ !! ] '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/WHITE_HOUSE_col_linh_$UDIM.exr' is not a valid OpenEXR file
-Debug : [          MriOpenExrSource.cpp:815 ] : [ !! ] '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh_$UDIM.exr' is not a valid OpenEXR file
-Debug : [   MriExportSequenceWidget.cpp:275 ] : About to export : /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh_$UDIM.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh_1001.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh_1002.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh_1003.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh_1004.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh_1005.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh_1006.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh_1007.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh_1008.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh_1009.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh_1010.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh_1011.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh_1012.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh_1013.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh_1014.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh_1015.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh_1016.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh_1017.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh_1018.exr
-Debug : [           MriImageManager.cpp:1175] : [ 1 ] Found support for image write format exr in MriOpenExrSink@Wetafx.co.nz
-Debug : [            MriUndoManager.cpp:275 ] : [UndoManager] End Macro #1 : Export Images
-Debug : [            MriUndoManager.cpp:178 ] : [UndoManager] Undo : Export Images
-Debug : [            MriUndoManager.cpp:158 ] : [UndoManager] Begin Macro #1 : 
-Debug : [            MriUndoManager.cpp:275 ] : [UndoManager] End Macro #1 : 
-Debug : [            MriUndoManager.cpp:178 ] : [UndoManager] Undo : 
-Debug : [          MriImageExporter.cpp:1999] : Export 22719 ms
-Debug : [     MriBackgroundJobManager.h:187 ] : Job 1 took 85169 ms
-
-
-valid OpenEXR file
-Debug : [          MriOpenExrSource.cpp:815 ] : [ !! ] '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh_$UDIM.exr' is not a valid OpenEXR file
-Repeat : Message repeating...
-Repeat : Last message was repeated 2 more times
-Debug : [          MriOpenExrSource.cpp:815 ] : [ !! ] '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_$UDIM.exr' is not a valid OpenEXR file
-Debug : [   MriExportSequenceWidget.cpp:275 ] : About to export : /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_$UDIM.exr
-Debug : [           MriImageManager.cpp:1504] : [ 1 ] 'TheFoundry.MriPsdSink' => 'psb', 'psd'
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1001.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1002.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1003.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1004.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1005.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1006.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1007.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1008.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1009.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1010.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1011.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1012.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1013.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1014.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1015.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1016.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1017.exr
-Debug : [          MriImageExporter.cpp:1326] : Checking image layer list with 1 layers to export to /X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1018.exr
-Debug : [           MriImageManager.cpp:1175] : [ 1 ] Found support for image write format exr in TheFoundry.MriImagePluginSink
-Debug : [        MriImagePluginSink.cpp:652 ] : Saving '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1017.exr' using plug-in 'CcExrImageWriterPlugin'
-Debug : [        MriImagePluginSink.cpp:652 ] : Saving '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1018.exr' using plug-in 'CcExrImageWriterPlugin'
-Debug : [        MriImagePluginSink.cpp:652 ] : Saving '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1016.exr' using plug-in 'CcExrImageWriterPlugin'
-Debug : [        MriImagePluginSink.cpp:652 ] : Saving '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1001.exr' using plug-in 'CcExrImageWriterPlugin'
-Debug : [        MriImagePluginSink.cpp:652 ] : Saving '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1013.exr' using plug-in 'CcExrImageWriterPlugin'
-Debug : [        MriImagePluginSink.cpp:652 ] : Saving '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1004.exr' using plug-in 'CcExrImageWriterPlugin'
-Debug : [        MriImagePluginSink.cpp:652 ] : Saving '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1014.exr' using plug-in 'CcExrImageWriterPlugin'
-Debug : [        MriImagePluginSink.cpp:652 ] : Saving '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1006.exr' using plug-in 'CcExrImageWriterPlugin'
-Debug : [        MriImagePluginSink.cpp:652 ] : Saving '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1003.exr' using plug-in 'CcExrImageWriterPlugin'
-Debug : [        MriImagePluginSink.cpp:652 ] : Saving '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1012.exr' using plug-in 'CcExrImageWriterPlugin'
-Debug : [        MriImagePluginSink.cpp:652 ] : Saving '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1011.exr' using plug-in 'CcExrImageWriterPlugin'
-Debug : [        MriImagePluginSink.cpp:652 ] : Saving '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1008.exr' using plug-in 'CcExrImageWriterPlugin'
-Debug : [        MriImagePluginSink.cpp:652 ] : Saving '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1015.exr' using plug-in 'CcExrImageWriterPlugin'
-Debug : [        MriImagePluginSink.cpp:652 ] : Saving '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1007.exr' using plug-in 'CcExrImageWriterPlugin'
-Debug : [        MriImagePluginSink.cpp:652 ] : Saving '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1005.exr' using plug-in 'CcExrImageWriterPlugin'
-Debug : [        MriImagePluginSink.cpp:652 ] : Saving '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1009.exr' using plug-in 'CcExrImageWriterPlugin'
-Debug : [        MriImagePluginSink.cpp:652 ] : Saving '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1002.exr' using plug-in 'CcExrImageWriterPlugin'
-Debug : [        MriImagePluginSink.cpp:652 ] : Saving '/X/projects/mena/SHOTS/WHITE_HOUSE/chichang/textures/WHITE_HOUSE/test/WHITE_HOUSE_col_linh2_1010.exr' using plug-in 'CcExrImageWriterPlugin'
-Debug : [            MriUndoManager.cpp:275 ] : [UndoManager] End Macro #1 : Export Images
-Debug : [            MriUndoManager.cpp:178 ] : [UndoManager] Undo : Export Images
-Debug : [            MriUndoManager.cpp:158 ] : [UndoManager] Begin Macro #1 : 
-Debug : [            MriUndoManager.cpp:275 ] : [UndoManager] End Macro #1 : 
-Debug : [            MriUndoManager.cpp:178 ] : [UndoManager] Undo : 
-Debug : [          MriImageExporter.cpp:1999] : Export 14368 ms
-Debug : [            MriUndoManager.cpp:328 ] : [UndoManager] Add : Pan
-Debug : [     MriBackgroundJobManager.h:187 ] : Job 1 took 200109 ms
-*/
